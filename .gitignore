@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.npm-cache/
+circle-output/
+users.db
+users.db-*
+.env
+.env.*
+!.env.example
+npm-debug.log*
+dev-server.*.log
