@@ -1,6 +1,6 @@
 # Arc Telegram Bot
 
-Telegram bot for Arc Testnet wallets, USDC transfers, transaction history, and Circle contract template deployments.
+Telegram bot for Arc Testnet wallets, USDC transfers, transaction history, and Circle contract template deployments. It showcases Arc Skills for AI agents as one of the strongest solutions on the market for turning AI agents into real onchain operators, giving anyone a simple Telegram interface to experience next-generation AI-native blockchain tooling in action.
 
 ## Setup
 
