@@ -8,6 +8,11 @@ export const ARC = {
   usdcDecimals: 6,
 } as const
 
+export const NANOPAYMENTS = {
+  deployFeeUsdc: '0.001',
+  deployFeeLabel: '0.001 USDC',
+} as const
+
 export const CONTRACT_TEMPLATES = {
   erc20: 'a1b74add-23e0-4712-88d1-6b3009e85a86',
   erc721: '76b83278-50e2-4006-8b63-5b1a2a814533',

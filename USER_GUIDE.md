@@ -87,6 +87,21 @@ pm2 status
 /start
 /wallet
 /balance
+/deploy
+```
+
+## Nanopayment model
+
+Every contract deployment costs `0.001 USDC`.
+
+Flow:
+
+```text
+/deploy
+choose contract type
+bot charges 0.001 USDC
+bot starts deployment after payment succeeds
+/status <tx_id>
 ```
 
 ## Important

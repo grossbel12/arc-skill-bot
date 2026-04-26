@@ -7,10 +7,11 @@ import {
   deployERC20,
   deployERC721,
 } from '../circle/contracts.js'
-import { getTransaction } from '../circle/wallets.js'
-import { getDeployment, getLatestDeploymentForUser, getUser, saveDeployment } from '../db.js'
+import { collectDeployFee, getTransaction, getUsdcBalance } from '../circle/wallets.js'
+import { NANOPAYMENTS } from '../config.js'
+import { getDeployment, getLatestDeploymentForUser, getUser, saveDeployment, savePayment } from '../db.js'
 import { addressLink, divider, genericError, noWalletMessage } from '../messages.js'
-import { getTelegramId } from '../utils.js'
+import { formatUsdc, getTelegramId, toNumber } from '../utils.js'
 
 type DeploySession = {
   type: Exclude<DeployType, 'Airdrop'>
@@ -98,15 +99,36 @@ async function ensureUser(ctx: Context) {
 async function startDeployment(
   ctx: Context,
   type: DeployType,
+  walletId: string,
   deploy: () => Promise<unknown>,
   name?: string,
   symbol?: string,
 ) {
   try {
+    const telegramId = getTelegramId(ctx)
+    if (!telegramId) return
+
+    const balance = await getUsdcBalance(walletId)
+    if (toNumber(balance) < toNumber(NANOPAYMENTS.deployFeeUsdc)) {
+      await ctx.reply(
+        `❌ Not enough USDC for this paid agent action.\n\nRequired fee: ${NANOPAYMENTS.deployFeeLabel}\nYour balance: ${formatUsdc(balance)} USDC\n\nFund your wallet with test USDC first, then try /deploy again.`,
+      )
+      return
+    }
+
+    await ctx.reply(
+      `💳 Agentic payment required\n\nAction: Deploy ${type} contract\nPrice: ${NANOPAYMENTS.deployFeeLabel}\n\nCharging your Arc wallet now. Deployment starts after payment succeeds.`,
+    )
+
+    const payment = await collectDeployFee(walletId)
+    savePayment(payment.transactionId, telegramId, walletId, NANOPAYMENTS.deployFeeUsdc, `deploy:${type}`)
+    await ctx.reply(
+      `✅ Nanopayment accepted\n\nPaid: ${NANOPAYMENTS.deployFeeLabel}\nPayment TX: ${payment.transactionId}\n\nStarting contract deployment now...`,
+    )
+
     const response = await deploy()
     const txId = getDeployId(response)
     const contractId = getContractId(response)
-    const telegramId = getTelegramId(ctx)
     if (telegramId && txId !== 'pending') saveDeployment(txId, telegramId, type)
 
     const details =
@@ -139,7 +161,7 @@ export function registerDeployHandler(bot: Telegraf) {
 
     const selection = ctx.match[1]
     if (selection === 'airdrop') {
-      await startDeployment(ctx, 'Airdrop', () =>
+      await startDeployment(ctx, 'Airdrop', ready.user.wallet_id, () =>
         deployAirdrop(ready.user.wallet_id, ready.user.wallet_address),
       )
       return
@@ -213,15 +235,15 @@ export function registerDeployHandler(bot: Telegraf) {
 
     sessions.delete(telegramId)
     if (session.type === 'ERC-20') {
-      await startDeployment(ctx, session.type, () =>
+      await startDeployment(ctx, session.type, user.wallet_id, () =>
         deployERC20(user.wallet_id, user.wallet_address, name, symbol),
       name, symbol)
     } else if (session.type === 'ERC-721') {
-      await startDeployment(ctx, session.type, () =>
+      await startDeployment(ctx, session.type, user.wallet_id, () =>
         deployERC721(user.wallet_id, user.wallet_address, name, symbol),
       name, symbol)
     } else {
-      await startDeployment(ctx, session.type, () =>
+      await startDeployment(ctx, session.type, user.wallet_id, () =>
         deployERC1155(user.wallet_id, user.wallet_address, name, symbol),
       name, symbol)
     }

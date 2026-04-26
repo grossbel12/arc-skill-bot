@@ -1,29 +1,9 @@
 import type { Telegraf } from 'telegraf'
 import { ARC } from '../config.js'
-import { getUsdcBalance, sendUsdc } from '../circle/wallets.js'
+import { getTransactionIdentifier, getUsdcBalance, sendUsdc } from '../circle/wallets.js'
 import { getUser } from '../db.js'
 import { divider, genericError, noWalletMessage, txLink } from '../messages.js'
 import { formatUsdc, getTelegramId, isValidAddress, parsePositiveAmount, toNumber } from '../utils.js'
-
-type TransactionResponse = {
-  transaction?: { id?: string; txHash?: string; transactionHash?: string }
-  id?: string
-  txHash?: string
-  transactionHash?: string
-}
-
-function getTxIdentifier(data: unknown) {
-  const response = data as TransactionResponse | undefined
-  return (
-    response?.transaction?.txHash ??
-    response?.transaction?.transactionHash ??
-    response?.transaction?.id ??
-    response?.txHash ??
-    response?.transactionHash ??
-    response?.id ??
-    'pending'
-  )
-}
 
 export function registerSendHandler(bot: Telegraf) {
   bot.command('send', async (ctx) => {
@@ -60,7 +40,7 @@ export function registerSendHandler(bot: Telegraf) {
 
       await ctx.reply(`📤 Sending ${formatUsdc(amount)} USDC to ${toAddress}...`)
       const response = await sendUsdc(user.wallet_id, toAddress, amount)
-      const tx = getTxIdentifier(response)
+      const tx = getTransactionIdentifier(response)
       const link = tx.startsWith('0x') ? `\n🔎 ${txLink(tx)}` : ''
 
       await ctx.reply(

@@ -1,13 +1,22 @@
 import { randomUUID } from 'node:crypto'
-import { ARC } from '../config.js'
+import { ARC, NANOPAYMENTS } from '../config.js'
 import { getAppState, setAppState } from '../db.js'
 import { walletClient } from './client.js'
 
 const WALLET_SET_KEY = 'wallet_set_id'
+const FEE_COLLECTOR_WALLET_ID_KEY = 'fee_collector_wallet_id'
+const FEE_COLLECTOR_WALLET_ADDRESS_KEY = 'fee_collector_wallet_address'
 
 type CircleTokenBalance = {
   token?: { symbol?: string; tokenAddress?: string }
   amount?: string
+}
+
+type CircleTransactionResponse = {
+  transaction?: { id?: string; txHash?: string; transactionHash?: string }
+  id?: string
+  txHash?: string
+  transactionHash?: string
 }
 
 export async function getOrCreateWalletSetId() {
@@ -40,6 +49,19 @@ export async function createUserWallet() {
   return { walletId: wallet.id, walletAddress: wallet.address }
 }
 
+export async function getOrCreateFeeCollectorWallet() {
+  const existingWalletId = getAppState(FEE_COLLECTOR_WALLET_ID_KEY)
+  const existingWalletAddress = getAppState(FEE_COLLECTOR_WALLET_ADDRESS_KEY)
+  if (existingWalletId && existingWalletAddress) {
+    return { walletId: existingWalletId, walletAddress: existingWalletAddress }
+  }
+
+  const wallet = await createUserWallet()
+  setAppState(FEE_COLLECTOR_WALLET_ID_KEY, wallet.walletId)
+  setAppState(FEE_COLLECTOR_WALLET_ADDRESS_KEY, wallet.walletAddress)
+  return wallet
+}
+
 export async function getTokenBalances(walletId: string) {
   const response = await walletClient().getWalletTokenBalance({ id: walletId } as never)
   return (response.data?.tokenBalances ?? []) as CircleTokenBalance[]
@@ -67,6 +89,28 @@ export async function sendUsdc(walletId: string, toAddress: string, amount: stri
     idempotencyKey: randomUUID(),
   } as never)
   return response.data
+}
+
+export function getTransactionIdentifier(data: unknown) {
+  const response = data as CircleTransactionResponse | undefined
+  return (
+    response?.transaction?.txHash ??
+    response?.transaction?.transactionHash ??
+    response?.transaction?.id ??
+    response?.txHash ??
+    response?.transactionHash ??
+    response?.id ??
+    'pending'
+  )
+}
+
+export async function collectDeployFee(walletId: string) {
+  const collector = await getOrCreateFeeCollectorWallet()
+  const response = await sendUsdc(walletId, collector.walletAddress, NANOPAYMENTS.deployFeeUsdc)
+  return {
+    collectorAddress: collector.walletAddress,
+    transactionId: getTransactionIdentifier(response),
+  }
 }
 
 export async function getTransactions(walletId: string) {

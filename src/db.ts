@@ -14,6 +14,15 @@ export type DeploymentRecord = {
   created_at: string
 }
 
+export type PaymentRecord = {
+  tx_id: string
+  telegram_id: number
+  wallet_id: string
+  amount: string
+  action: string
+  created_at: string
+}
+
 const db = new Database('users.db')
 
 db.exec(`
@@ -33,6 +42,15 @@ db.exec(`
     tx_id TEXT PRIMARY KEY,
     telegram_id INTEGER NOT NULL,
     type TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS payments (
+    tx_id TEXT PRIMARY KEY,
+    telegram_id INTEGER NOT NULL,
+    wallet_id TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    action TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `)
@@ -78,4 +96,16 @@ export function getLatestDeploymentForUser(telegramId: number): DeploymentRecord
   return db
     .prepare('SELECT * FROM deployments WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 1')
     .get(telegramId) as DeploymentRecord | undefined
+}
+
+export function savePayment(
+  txId: string,
+  telegramId: number,
+  walletId: string,
+  amount: string,
+  action: string,
+) {
+  db.prepare(
+    'INSERT OR REPLACE INTO payments (tx_id, telegram_id, wallet_id, amount, action) VALUES (?, ?, ?, ?, ?)',
+  ).run(txId, telegramId, walletId, amount, action)
 }
